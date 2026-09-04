@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/support.db
+data/embedding_cache.json
+.env

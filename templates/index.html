@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexusTiQ24 Support Desk</title><link rel="stylesheet" href="/static/css/styles.css"></head>
+<body>
+  <header><div><h1>NexusTiQ24 Support Desk</h1><p>Customer Support Resolution Assistant</p></div><span id="health">Checking service…</span></header>
+  <main>
+    <section class="selector"><label for="customer-select">Customer account</label><select id="customer-select"></select></section>
+    <div class="grid">
+      <section class="card"><h2>Conversation</h2><div id="conversation" class="conversation"></div><label for="message">Latest customer message</label><textarea id="message" placeholder="Enter the customer's latest message"></textarea><button id="analyze">Analyze case</button></section>
+      <section class="card"><h2>Assistant recommendation</h2><div id="recommendation" class="empty">Select a customer and analyze a request.</div></section>
+      <section class="card"><h2>Account context</h2><div id="account" class="empty">Loading…</div><h2>Recent tickets</h2><div id="tickets"></div></section>
+    </div>
+  </main>
+  <script src="/static/js/app.js"></script>
+</body></html>
