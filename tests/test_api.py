@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 from src.database import initialize_database
 from src.web import app
+from uuid import uuid4
 
 
 def setup_module(): initialize_database()
@@ -12,11 +13,11 @@ def test_health_and_customers():
     assert client.get("/api/customers").status_code == 200
 
 
-def analyze(client, customer_id, message, session_id):
+def analyze(client, customer_id, message, session_id, unique=True):
     response = client.post("/api/cases/analyze", json={
         "customer_id": customer_id,
         "message": message,
-        "session_id": session_id,
+        "session_id": f"{session_id}-{uuid4()}" if unique else session_id,
     })
     assert response.status_code == 200
     return response.json()
@@ -67,6 +68,6 @@ def assert_handover(response):
 def test_conversation_is_preserved_through_api():
     client = TestClient(app)
     session_id = "audit-conversation"
-    analyze(client, "C001", "My broadband connection is down", session_id)
+    analyze(client, "C001", "My broadband connection is down", session_id, unique=False)
     messages = client.get(f"/api/customers/C001/conversation?session_id={session_id}").json()
     assert [message["role"] for message in messages][-2:] == ["customer", "assistant"]

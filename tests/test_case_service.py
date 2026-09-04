@@ -2,6 +2,8 @@ from src.database import initialize_database
 from src.case_service import analyze
 from src.schemas import AnalyzeRequest
 import src.case_service as case_service
+from src.repositories import add_message
+from uuid import uuid4
 
 
 def setup_module():
@@ -9,7 +11,7 @@ def setup_module():
 
 
 def run(customer_id, message):
-    return analyze(AnalyzeRequest(customer_id=customer_id,session_id="test-suite",message=message))
+    return analyze(AnalyzeRequest(customer_id=customer_id,session_id=f"test-{uuid4()}",message=message))
 
 
 def test_known_outage_resolution():
@@ -62,3 +64,21 @@ def test_valid_gemini_grounded_resolution_is_used(monkeypatch):
     assert result.outcome == "resolution"
     assert result.confidence == "high"
     assert result.citations[0].article_id == "KB-BILL-001"
+
+
+def test_prior_conversation_troubleshooting_prevents_repeating_steps():
+    session_id=f"test-repeated-{uuid4()}"
+    add_message("C001",session_id,"customer","I rebooted the router, checked the cable, and reset it already.")
+    result=analyze(AnalyzeRequest(customer_id="C001",session_id=session_id,message="All devices are still down."))
+    assert result.outcome == "escalate"
+    assert "troubleshooting" in result.handover.reason_for_transfer.lower()
+    assert any("rebooted" in step.lower() for step in result.handover.tried)
+
+
+def test_follow_up_is_bounded_and_escalates_after_two_questions():
+    session_id=f"test-bounded-{uuid4()}"
+    add_message("C001",session_id,"assistant","Are all devices affected, or only one device?")
+    add_message("C001",session_id,"assistant","Are all devices affected, or only one device?")
+    result=analyze(AnalyzeRequest(customer_id="C001",session_id=session_id,message="My broadband is still down."))
+    assert result.outcome == "escalate"
+    assert "two targeted follow-ups" in result.handover.reason_for_transfer

@@ -27,6 +27,11 @@ def test_repeated_fault_escalates():
     assert decide("All devices are down", context(actions="Router reboot; cable check; router reset.")).outcome == "escalate"
 
 
+def test_payment_success_wording_and_suspicious_activity_escalate():
+    assert decide("My payment was successful", context(payment_status="overdue")).outcome == "escalate"
+    assert decide("I see suspicious activity on my account", context()).outcome == "escalate"
+
+
 def test_missing_billing_detail_gets_one_targeted_question():
     data = context()
     data["billing"]["recent_charge_summary"] = ""

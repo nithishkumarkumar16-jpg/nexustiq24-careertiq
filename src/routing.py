@@ -13,10 +13,10 @@ def decide(message: str, context: dict) -> RouteDecision:
     text=message.lower()
     service=context["service"]; billing=context["billing"]; tickets=context["tickets"]
     all_actions=" ".join(t.get("actions_taken","") for t in tickets).lower()
-    security_terms=("unknown charge","unrecognized","fraud","scam","not my charge")
+    security_terms=("unknown charge","unrecognized","fraud","scam","not my charge","suspicious activity","account hacked","account compromise")
     if any(term in text for term in security_terms):
         return RouteDecision("escalate","Possible unknown charge or account-security issue")
-    payment_claim=("i paid","paid already","made a payment","payment made")
+    payment_claim=("i paid","paid already","made a payment","payment made","payment was successful","payment succeeded")
     if any(term in text for term in payment_claim) and billing.get("payment_status")=="overdue":
         return RouteDecision("escalate","Customer payment claim conflicts with unrecorded overdue account")
     if service.get("service_status")=="outage-affected" and any(x in text for x in ("internet","broadband","connection","down","offline","outage")):

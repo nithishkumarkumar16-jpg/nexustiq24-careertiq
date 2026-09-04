@@ -6,6 +6,8 @@ from src.routing import decide
 from src.gemini_client import draft_with_gemini
 from src.guardrails import validate_model_result
 
+MAX_FOLLOW_UPS_PER_CASE = 2
+
 
 def _retrieval_query(message: str, conversation: list[dict], context: dict) -> str:
     """Use support-relevant context only; exclude contact details and addresses."""
@@ -31,6 +33,24 @@ def _verified_facts(context: dict) -> dict:
         "last_invoice_amount": billing.get("last_invoice_amount"), "recent_charge_summary": billing.get("recent_charge_summary"),
         "recent_ticket_actions": [ticket.get("actions_taken") for ticket in context["tickets"] if ticket.get("actions_taken")],
     }
+
+
+def _routing_context(context: dict, conversation: list[dict]) -> dict:
+    """Include previously stated troubleshooting in deterministic routing, not the LLM."""
+    prior_actions = " ".join(
+        message["content"] for message in conversation
+        if message["role"] in {"customer", "agent"}
+    )
+    routed = dict(context)
+    routed["tickets"] = [*context["tickets"], {"actions_taken": prior_actions}]
+    return routed
+
+
+def _follow_up_count(conversation: list[dict]) -> int:
+    return sum(
+        1 for message in conversation
+        if message["role"] == "assistant" and message["content"].strip().endswith("?")
+    )
 
 
 def _citations(evidence: list[dict]) -> list[Citation]:
@@ -83,13 +103,17 @@ def analyze(payload: AnalyzeRequest) -> AssistantResult | None:
     add_message(payload.customer_id,payload.session_id,"customer",payload.message)
     conversation=get_messages(payload.customer_id,payload.session_id)
     evidence=retriever.search(_retrieval_query(payload.message, conversation, context),context["service"].get("service_type",""))
-    decision=decide(payload.message,context)
+    routing_context=_routing_context(context, conversation)
+    decision=decide(payload.message,routing_context)
+    if decision.outcome == "follow_up" and _follow_up_count(conversation) >= MAX_FOLLOW_UPS_PER_CASE:
+        from src.routing import RouteDecision
+        decision=RouteDecision("escalate", "Required clarification was not obtained after two targeted follow-ups")
     # Deterministic follow-up/escalation rules take precedence over generated prose.
     if decision.outcome in {"follow_up","escalate"}:
-        result=_fallback(payload.message,context,evidence,decision)
+        result=_fallback(payload.message,routing_context,evidence,decision)
     else:
         raw=draft_with_gemini(_verified_facts(context),conversation,evidence,decision.reason)
         # Gemini may safely choose follow-up or escalation when retrieved evidence shows it is needed.
-        result=validate_model_result(raw,evidence) or _fallback(payload.message,context,evidence,decision)
+        result=validate_model_result(raw,evidence) or _fallback(payload.message,routing_context,evidence,decision)
     add_message(payload.customer_id,payload.session_id,"assistant",result.draft_response or result.follow_up_question)
     return result
