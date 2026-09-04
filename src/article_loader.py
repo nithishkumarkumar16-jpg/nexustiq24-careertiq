@@ -29,5 +29,6 @@ def load_articles() -> list[dict[str, Any]]:
                 current=line[2:].strip();buffer=[]
             else: buffer.append(line)
         if buffer: sections.append({"heading":current,"text":"\n".join(buffer).strip()})
+        meta["chunks"]=[{"article_id":meta["id"],"title":meta["title"],"section":section["heading"],"source_text":section["text"]} for section in sections if section["text"]]
         meta["sections"]=sections; meta["path"]=str(path); articles.append(meta)
     return articles

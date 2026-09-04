@@ -10,7 +10,7 @@ from src.config import EMBEDDING_CACHE_PATH, GEMINI_API_KEY, EMBEDDING_MODEL
 class LocalRetriever:
     def __init__(self):
         self.articles=load_articles()
-        self.chunks=[{"article_id":a["id"],"title":a["title"],"category":a.get("category",""),"applies_to":a.get("applies_to",[]),"keywords":a.get("keywords",[]),"section":s["heading"],"text":s["text"]} for a in self.articles for s in a["sections"]]
+        self.chunks=[{**chunk,"text":chunk["source_text"],"category":article.get("category",""),"applies_to":article.get("applies_to",[]),"keywords":article.get("keywords",[])} for article in self.articles for chunk in article["chunks"]]
         self.vectors: list[list[float]]=[]
         self.embedding_ready=False
         self._load_or_create_embeddings()
@@ -26,6 +26,8 @@ class LocalRetriever:
             client=genai.Client(api_key=GEMINI_API_KEY)
             response=client.models.embed_content(model=EMBEDDING_MODEL, contents=texts)
             self.vectors=[list(item.values) for item in response.embeddings]
+            if not self.vectors or len(self.vectors) != len(texts):
+                raise ValueError("Embedding response did not match local chunks")
             EMBEDDING_CACHE_PATH.write_text(json.dumps({"texts":texts,"vectors":self.vectors}),encoding="utf-8")
             self.embedding_ready=True
         except Exception:
@@ -40,12 +42,17 @@ class LocalRetriever:
         return set(re.findall(r"[a-z0-9]+",text.lower()))
 
     def _keyword_search(self, query: str, service_type: str, limit: int) -> list[dict]:
-        words=self._words(query); scored=[]
+        primary_query=query.split("\n", 1)[0].removeprefix("Customer request:")
+        primary_words=self._words(primary_query)
+        context_words=self._words(query)
+        scored=[]
         for chunk in self.chunks:
             if service_type and service_type not in chunk["applies_to"]: continue
             corpus=self._words(" ".join(chunk["keywords"])+" "+chunk["title"]+" "+chunk["text"])
-            score=len(words & corpus)
-            if score: scored.append((score,chunk))
+            primary_score=len(primary_words & corpus)
+            # Context refines matching; it cannot make an unrelated request retrievable.
+            score=(primary_score * 3) + len(context_words & corpus)
+            if primary_score: scored.append((score,chunk))
         return [dict(c, score=float(s), retrieval_method="keyword") for s,c in sorted(scored,key=lambda x:x[0],reverse=True)[:limit]]
 
     def search(self, query: str, service_type: str="", limit: int=4) -> list[dict[str,Any]]:

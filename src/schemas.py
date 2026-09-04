@@ -27,5 +27,6 @@ class AssistantResult(BaseModel):
     draft_response: str = ""
     follow_up_question: str = ""
     citations: list[Citation] = []
+    confidence: Literal["high", "medium", "low"] = "low"
     handover: Handover | None = None
     status_note: str = ""

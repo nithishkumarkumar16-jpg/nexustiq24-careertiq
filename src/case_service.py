@@ -7,6 +7,32 @@ from src.gemini_client import draft_with_gemini
 from src.guardrails import validate_model_result
 
 
+def _retrieval_query(message: str, conversation: list[dict], context: dict) -> str:
+    """Use support-relevant context only; exclude contact details and addresses."""
+    service = context["service"]
+    billing = context["billing"]
+    recent = " ".join(item["content"] for item in conversation[-6:])
+    state = " ".join(filter(None, [
+        service.get("service_type"), service.get("service_status"), service.get("plan_name"),
+        billing.get("payment_status"), billing.get("recent_charge_summary"),
+    ]))
+    return f"Customer request: {message}\nRecent conversation: {recent}\nService and account state: {state}"
+
+
+def _verified_facts(context: dict) -> dict:
+    """The Gemini boundary: only verified, minimally necessary support facts."""
+    service = context["service"]
+    billing = context["billing"]
+    return {
+        "service_type": service.get("service_type"), "plan_name": service.get("plan_name"),
+        "service_status": service.get("service_status"), "contract_end_date": service.get("contract_end_date"),
+        "usage_summary": service.get("usage_summary"), "payment_status": billing.get("payment_status"),
+        "current_balance": billing.get("current_balance"), "last_invoice_date": billing.get("last_invoice_date"),
+        "last_invoice_amount": billing.get("last_invoice_amount"), "recent_charge_summary": billing.get("recent_charge_summary"),
+        "recent_ticket_actions": [ticket.get("actions_taken") for ticket in context["tickets"] if ticket.get("actions_taken")],
+    }
+
+
 def _citations(evidence: list[dict]) -> list[Citation]:
     unique=[]; seen=set()
     for e in evidence:
@@ -56,14 +82,14 @@ def analyze(payload: AnalyzeRequest) -> AssistantResult | None:
     if not context: return None
     add_message(payload.customer_id,payload.session_id,"customer",payload.message)
     conversation=get_messages(payload.customer_id,payload.session_id)
-    # The customer message drives relevance; service type filters eligible articles.
-    evidence=retriever.search(payload.message,context["service"].get("service_type",""))
+    evidence=retriever.search(_retrieval_query(payload.message, conversation, context),context["service"].get("service_type",""))
     decision=decide(payload.message,context)
     # Deterministic follow-up/escalation rules take precedence over generated prose.
     if decision.outcome in {"follow_up","escalate"}:
         result=_fallback(payload.message,context,evidence,decision)
     else:
-        raw=draft_with_gemini(context,conversation,evidence,decision.reason)
-        result=validate_model_result(raw,evidence,forced_outcome="resolution") or _fallback(payload.message,context,evidence,decision)
+        raw=draft_with_gemini(_verified_facts(context),conversation,evidence,decision.reason)
+        # Gemini may safely choose follow-up or escalation when retrieved evidence shows it is needed.
+        result=validate_model_result(raw,evidence) or _fallback(payload.message,context,evidence,decision)
     add_message(payload.customer_id,payload.session_id,"assistant",result.draft_response or result.follow_up_question)
     return result

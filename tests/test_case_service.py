@@ -1,6 +1,7 @@
 from src.database import initialize_database
 from src.case_service import analyze
 from src.schemas import AnalyzeRequest
+import src.case_service as case_service
 
 
 def setup_module():
@@ -47,3 +48,17 @@ def test_repeated_troubleshooting_escalates():
 def test_unsupported_request_escalates():
     result=run("C003","Can you repair my refrigerator?")
     assert result.outcome == "escalate"
+
+
+def test_valid_gemini_grounded_resolution_is_used(monkeypatch):
+    evidence=[{"article_id":"KB-BILL-001","title":"Understanding a higher-than-expected bill","section":"Approved resolution","text":"Explain only the charge listed in the account record."}]
+    monkeypatch.setattr(case_service.retriever, "search", lambda *args, **kwargs: evidence)
+    monkeypatch.setattr(case_service, "draft_with_gemini", lambda *args, **kwargs: {
+        "outcome":"resolution", "draft_response":"Your invoice record includes a router delivery charge.",
+        "follow_up_question":"", "citations":[{"article_id":"KB-BILL-001","section":"Approved resolution"}],
+        "confidence":"high", "unsupported_claims":[], "handover":None,
+    })
+    result=run("C001","Why is my bill higher this month?")
+    assert result.outcome == "resolution"
+    assert result.confidence == "high"
+    assert result.citations[0].article_id == "KB-BILL-001"
