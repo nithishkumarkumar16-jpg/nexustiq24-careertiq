@@ -25,3 +25,11 @@ def test_payment_conflict_escalates():
 
 def test_repeated_fault_escalates():
     assert decide("All devices are down", context(actions="Router reboot; cable check; router reset.")).outcome == "escalate"
+
+
+def test_missing_billing_detail_gets_one_targeted_question():
+    data = context()
+    data["billing"]["recent_charge_summary"] = ""
+    result = decide("Why is my bill higher?", data)
+    assert result.outcome == "follow_up"
+    assert result.follow_up == "Could you share the date and amount of the charge you’re querying?"
