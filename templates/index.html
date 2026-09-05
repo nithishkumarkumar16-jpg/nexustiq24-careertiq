@@ -1,15 +1,86 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexusTiQ24 Support Desk</title><link rel="stylesheet" href="/static/css/styles.css"></head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResolveIQ - Grounded Telecom Support Resolution</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
 <body>
-  <header><div><h1>NexusTiQ24 Support Desk</h1><p>Customer Support Resolution Assistant</p></div><span id="health">Checking service…</span></header>
-  <main>
-    <section class="selector"><label for="customer-select">Customer account</label><select id="customer-select"></select></section>
-    <div class="grid">
-      <section class="card"><h2>Conversation</h2><div id="conversation" class="conversation"></div><label for="message">Latest customer message</label><textarea id="message" placeholder="Enter the customer's latest message"></textarea><button id="analyze">Analyze case</button></section>
-      <section class="card"><h2>Assistant recommendation</h2><div id="recommendation" class="empty">Select a customer and analyze a request.</div></section>
-      <section class="card"><h2>Account context</h2><div id="account" class="empty">Loading…</div><h2>Recent tickets</h2><div id="tickets"></div></section>
-    </div>
-  </main>
-  <script src="/static/js/app.js"></script>
-</body></html>
+    <header>
+        <div class="header-title">
+            <h1>ResolveIQ</h1>
+            <p class="header-subtitle">Grounded Telecom Support Resolution Assistant</p>
+        </div>
+        <div class="header-status">
+            <span class="status-badge" id="health">Connecting...</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Customer Selector -->
+        <div class="selector-panel">
+            <label for="customer-select">Customer Case:</label>
+            <select id="customer-select">
+                <option>Loading customers...</option>
+            </select>
+            <span class="demo-badge">Demo Data</span>
+        </div>
+
+        <!-- Three-Column Layout -->
+        <div class="layout-grid">
+            <!-- LEFT PANEL: Customer Context -->
+            <div class="panel context-panel">
+                <div class="panel-header">
+                    <h2>Account Context</h2>
+                </div>
+                <div class="panel-content">
+                    <div id="account" class="account-info">
+                        <p class="placeholder">Select a customer to view account details</p>
+                    </div>
+                </div>
+
+                <div class="divider-section"></div>
+
+                <div class="panel-header">
+                    <h2>Recent Tickets</h2>
+                </div>
+                <div class="panel-content tickets-scroll">
+                    <div id="tickets" class="tickets-list">
+                        <p class="placeholder">No tickets loaded</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER PANEL: Conversation -->
+            <div class="panel conversation-panel">
+                <div class="panel-header">
+                    <h2>Case Conversation</h2>
+                </div>
+                <div class="conversation-history" id="conversation">
+                    <p class="placeholder">No conversation yet</p>
+                </div>
+
+                <div class="panel-footer">
+                    <textarea id="message" placeholder="Enter the latest customer message..." maxlength="4000"></textarea>
+                    <button id="analyze" class="btn btn-primary">Analyze Case</button>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Analysis Results -->
+            <div class="panel result-panel">
+                <div class="panel-header">
+                    <h2>Analysis Result</h2>
+                </div>
+                <div class="panel-content result-content">
+                    <div id="recommendation" class="recommendation-placeholder">
+                        <p>Submit a customer message to analyze the case</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
