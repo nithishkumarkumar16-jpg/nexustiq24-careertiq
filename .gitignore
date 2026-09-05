@@ -4,3 +4,4 @@ __pycache__/
 data/support.db
 data/embedding_cache.json
 .env
+.venv311/

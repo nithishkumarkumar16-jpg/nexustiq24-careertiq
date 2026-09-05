@@ -8,5 +8,5 @@ DB_PATH = DATA_DIR / "support.db"
 EMBEDDING_CACHE_PATH = DATA_DIR / "embedding_cache.json"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 EMBEDDING_MODEL = "gemini-embedding-001"
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
 DEFAULT_PORT = 8000

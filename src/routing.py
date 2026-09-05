@@ -19,6 +19,15 @@ def decide(message: str, context: dict) -> RouteDecision:
     payment_claim=("i paid","paid already","made a payment","payment made","payment was successful","payment succeeded")
     if any(term in text for term in payment_claim) and billing.get("payment_status")=="overdue":
         return RouteDecision("escalate","Customer payment claim conflicts with unrecorded overdue account")
+
+    unsupported_terms = (
+        "refrigerator", "fridge", "washing machine", "microwave",
+        "television", "tv", "air conditioner", "ac",
+        "laptop", "computer", "printer", "car", "bike"
+    )
+    if any(term in text for term in unsupported_terms):
+        return RouteDecision("escalate","Request is outside telecom support scope")
+
     if service.get("service_status")=="outage-affected" and any(x in text for x in ("internet","broadband","connection","down","offline","outage")):
         return RouteDecision("resolution","Known local outage")
     connectivity=any(x in text for x in ("internet","broadband","connection","wifi","wi-fi","router","offline","down"))
