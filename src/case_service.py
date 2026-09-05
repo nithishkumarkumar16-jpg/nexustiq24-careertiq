@@ -61,15 +61,20 @@ def _citations(evidence: list[dict]) -> list[Citation]:
     return unique
 
 
-def _handover(message: str, context: dict, reason: str) -> Handover:
+def _handover(message: str, context: dict, reason: str, prior_messages: list[dict] | None = None) -> Handover:
     tried=[]
     for ticket in context["tickets"]:
         if ticket.get("actions_taken"):
             tried.append(ticket["actions_taken"])
+    # Include prior conversation messages (customer and agent) but not the current message
+    if prior_messages:
+        for msg in prior_messages:
+            if msg["role"] in {"customer", "agent"} and msg["content"].strip():
+                tried.append(msg["content"])
     return Handover(issue_summary=message,established=[f"Service: {context['service'].get('service_status')}",f"Plan: {context['service'].get('plan_name')}",f"Billing status: {context['billing'].get('payment_status')}"],tried=tried,reason_for_transfer=reason)
 
 
-def _fallback(message: str, context: dict, evidence: list[dict], decision) -> AssistantResult:
+def _fallback(message: str, context: dict, evidence: list[dict], decision, original_context: dict | None = None, prior_conversation: list[dict] | None = None) -> AssistantResult:
     preferred_ids = {
         "Known local outage": {"KB-CONN-003"},
         "Possible unknown charge or account-security issue": {"KB-SEC-001"},
@@ -81,7 +86,8 @@ def _fallback(message: str, context: dict, evidence: list[dict], decision) -> As
     if decision.outcome=="follow_up":
         return AssistantResult(outcome="follow_up",follow_up_question=decision.follow_up,status_note="Targeted question selected by local case policy.")
     if decision.outcome=="escalate":
-        return AssistantResult(outcome="escalate",draft_response="I’m transferring this to a human support specialist so it can be reviewed safely.",citations=citations,handover=_handover(message,context,decision.reason),status_note="Escalation selected by local case policy.")
+        handover_context = original_context if original_context else context
+        return AssistantResult(outcome="escalate",draft_response="I'm transferring this to a human support specialist so it can be reviewed safely.",citations=citations,handover=_handover(message,handover_context,decision.reason,prior_messages=prior_conversation),status_note="Escalation selected by local case policy.")
     service=context["service"]; billing=context["billing"]
     lower=message.lower()
     if service.get("service_status")=="outage-affected":
@@ -109,11 +115,12 @@ def analyze(payload: AnalyzeRequest) -> AssistantResult | None:
         from src.routing import RouteDecision
         decision=RouteDecision("escalate", "Required clarification was not obtained after two targeted follow-ups")
     # Deterministic follow-up/escalation rules take precedence over generated prose.
+    prior_messages = conversation[:-1] if conversation else []
     if decision.outcome in {"follow_up","escalate"}:
-        result=_fallback(payload.message,routing_context,evidence,decision)
+        result=_fallback(payload.message,routing_context,evidence,decision,original_context=context,prior_conversation=prior_messages)
     else:
         raw=draft_with_gemini(_verified_facts(context),conversation,evidence,decision.reason)
         # Gemini may safely choose follow-up or escalation when retrieved evidence shows it is needed.
-        result=validate_model_result(raw,evidence) or _fallback(payload.message,routing_context,evidence,decision)
+        result=validate_model_result(raw,evidence) or _fallback(payload.message,routing_context,evidence,decision,original_context=context,prior_conversation=prior_messages)
     add_message(payload.customer_id,payload.session_id,"assistant",result.draft_response or result.follow_up_question)
     return result
